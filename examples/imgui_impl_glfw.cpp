@@ -64,10 +64,10 @@ enum GlfwClientApi
 };
 static GLFWwindow*          g_Window = NULL;    // Main window
 static GlfwClientApi        g_ClientApi = GlfwClientApi_Unknown;
-static double               g_Time = 0.0;
+static double               g_glfw_Time = 0.0;
 static bool                 g_MouseJustPressed[5] = { false, false, false, false, false };
 static GLFWcursor*          g_MouseCursors[ImGuiMouseCursor_COUNT] = { 0 };
-static bool                 g_WantUpdateMonitors = true;
+static bool                 g_glfw_WantUpdateMonitors = true;
 
 // Chain GLFW callbacks for main viewport: our callbacks will call the user's previously installed callbacks, if any.
 static GLFWmousebuttonfun   g_PrevUserCallbackMousebutton = NULL;
@@ -139,7 +139,7 @@ void ImGui_ImplGlfw_CharCallback(GLFWwindow* window, unsigned int c)
 static bool ImGui_ImplGlfw_Init(GLFWwindow* window, bool install_callbacks, GlfwClientApi client_api)
 {
     g_Window = window;
-    g_Time = 0.0;
+    g_glfw_Time = 0.0;
 
     // Setup back-end capabilities flags
     ImGuiIO& io = ImGui::GetIO();
@@ -381,13 +381,13 @@ void ImGui_ImplGlfw_NewFrame()
     io.DisplaySize = ImVec2((float)w, (float)h);
     if (w > 0 && h > 0)
         io.DisplayFramebufferScale = ImVec2((float)display_w / w, (float)display_h / h);
-    if (g_WantUpdateMonitors)
+    if (g_glfw_WantUpdateMonitors)
         ImGui_ImplGlfw_UpdateMonitors();
 
     // Setup time step
     double current_time = glfwGetTime();
-    io.DeltaTime = g_Time > 0.0 ? (float)(current_time - g_Time) : (float)(1.0f/60.0f);
-    g_Time = current_time;
+    io.DeltaTime = g_glfw_Time > 0.0 ? (float)(current_time - g_glfw_Time) : (float)(1.0f/60.0f);
+    g_glfw_Time = current_time;
 
     ImGui_ImplGlfw_UpdateMousePosAndButtons();
     ImGui_ImplGlfw_UpdateMouseCursor();
@@ -660,23 +660,23 @@ static void ImGui_ImplGlfw_SwapBuffers(ImGuiViewport* viewport, void*)
 
 // We provide a Win32 implementation because this is such a common issue for IME users
 #if defined(_WIN32) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS) && !defined(IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS) && !defined(__GNUC__)
-#define HAS_WIN32_IME   1
-#include <imm.h>
-#ifdef _MSC_VER
-#pragma comment(lib, "imm32")
-#endif
-static void ImGui_ImplWin32_SetImeInputPos(ImGuiViewport* viewport, ImVec2 pos)
-{
-    COMPOSITIONFORM cf = { CFS_FORCE_POSITION, { (LONG)(pos.x - viewport->Pos.x), (LONG)(pos.y - viewport->Pos.y) }, { 0, 0, 0, 0 } };
-    if (HWND hwnd = (HWND)viewport->PlatformHandleRaw)
-        if (HIMC himc = ::ImmGetContext(hwnd))
-        {
-            ::ImmSetCompositionWindow(himc, &cf);
-            ::ImmReleaseContext(hwnd, himc);
-        }
-}
+    #define HAS_WIN32_IME   1
+    #include <imm.h>
+    #ifdef _MSC_VER
+        #pragma comment(lib, "imm32")
+    #endif
+    static void ImGui_ImplGLFWWin32_SetImeInputPos(ImGuiViewport* viewport, ImVec2 pos)
+    {
+        COMPOSITIONFORM cf = { CFS_FORCE_POSITION, { (LONG)(pos.x - viewport->Pos.x), (LONG)(pos.y - viewport->Pos.y) }, { 0, 0, 0, 0 } };
+        if (HWND hwnd = (HWND)viewport->PlatformHandleRaw)
+            if (HIMC himc = ::ImmGetContext(hwnd))
+            {
+                ::ImmSetCompositionWindow(himc, &cf);
+                ::ImmReleaseContext(hwnd, himc);
+            }
+    }
 #else
-#define HAS_WIN32_IME   0
+    #define HAS_WIN32_IME   0
 #endif
 
 //--------------------------------------------------------------------------------------------------------
@@ -739,12 +739,12 @@ static void ImGui_ImplGlfw_UpdateMonitors()
 #endif
         platform_io.Monitors.push_back(monitor);
     }
-    g_WantUpdateMonitors = false;
+    g_glfw_WantUpdateMonitors = false;
 }
 
 static void ImGui_ImplGlfw_MonitorCallback(GLFWmonitor*, int)
 {
-    g_WantUpdateMonitors = true;
+    g_glfw_WantUpdateMonitors = true;
 }
 
 static void ImGui_ImplGlfw_InitPlatformInterface()
@@ -771,7 +771,7 @@ static void ImGui_ImplGlfw_InitPlatformInterface()
     platform_io.Platform_CreateVkSurface = ImGui_ImplGlfw_CreateVkSurface;
 #endif
 #if HAS_WIN32_IME
-    platform_io.Platform_SetImeInputPos = ImGui_ImplWin32_SetImeInputPos;
+    platform_io.Platform_SetImeInputPos = ImGui_ImplGLFWWin32_SetImeInputPos;
 #endif
 
     // Note: monitor callback are broken GLFW 3.2 and earlier (see github.com/glfw/glfw/issues/784)
